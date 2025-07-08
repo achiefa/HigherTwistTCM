@@ -1,0 +1,19 @@
+fitnames:
+  - 250705-ac-05-scaling-0p5_iterated
+  - 250702-ac-01-scaling-prior
+  - 250705-ac-06-scaling-1p5_iterated
+  
+fit_labels :
+  - $\textrm{DIS prior } 0.5 \textrm{ GeV}^2$
+  - $\textrm{DIS prior } 1.0 \textrm{ GeV}^2$
+  - $\textrm{DIS prior } 1.5 \textrm{ GeV}^2$
+
+colors:
+  - C0
+  - C1
+  - C2
+
+hatchs:
+  - '/'
+  - 'x'
+  - '|'
