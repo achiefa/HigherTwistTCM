@@ -13,15 +13,15 @@ import numpy as np
 
 from TCMAnalyser import TCMAnalyzer, setup_logging, SAVEDIR, fluctuate_points_cholesky, HT_PLOT_SPEC
 
-def process_single_fit(fitname: str, log_level: str) -> Tuple[bool, str, str]:
+def process_single_fit(fitname: str, log_level: str, force: bool) -> Tuple[bool, str, str]:
     """Process a single fit (for multiprocessing)"""
 
     setup_logging(log_level)
     analyzer = TCMAnalyzer(fitname)
-    success, _, error = analyzer.run_analysis()
+    success, _, error = analyzer.run_analysis(force=force)
     return success, fitname, error
 
-def batch_process_with_monitoring(fitargs: List[Tuple[str, str]], max_workers: int = 4):
+def batch_process_with_monitoring(fitargs: List[Tuple[str, str]], max_workers: int = 4, force: bool = False):
     """
     Process multiple fits with real-time monitoring and progress tracking
     """
@@ -33,7 +33,7 @@ def batch_process_with_monitoring(fitargs: List[Tuple[str, str]], max_workers: i
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         # Submit all jobs
         future_to_fit = {
-            executor.submit(process_single_fit, fit, log_level): fit
+            executor.submit(process_single_fit, fit, log_level, force): fit
             for fit, log_level in fitargs
         }
         
@@ -112,7 +112,9 @@ def generate_summary_report(output_file: str = "summary_report.html"):
     print(f"Summary report saved to {output_file}")
 
 
-def compare_multiple_fits(yaml_file: str, output_dir: str = "./Comparison"):
+def compare_multiple_fits(yaml_file: str,
+                          custom_keys: Optional[List[List[str]]] = None,
+                          output_dir: str = "./Comparison"):
     """
     Compare results from multiple fits and create comparison plots
     """
@@ -152,19 +154,24 @@ def compare_multiple_fits(yaml_file: str, output_dir: str = "./Comparison"):
         P_tilde_dict[fitname] = pd.read_pickle(SAVEDIR / f"{fitname}/P_tilde.pkl")
       except FileNotFoundError as e:
         print(e)
-
+    
     # Allow only common keys
     common_keys = list(set.intersection(*[set(x_nodes[fitname].keys()) for fitname in fitnames]))
 
-    for key in common_keys:
+    def make_plot(key1, key2=None):
         legends = []
         legend_names = []
 
         fig, ax = plt.subplots(figsize=(10, 5))
+        if key2 is None:
+            keys = [key1, key1]
+        else:
+            keys = [key1, key2]
 
-        ylabel = HT_PLOT_SPEC[key]["y_label"]
-        xlabel = HT_PLOT_SPEC[key]["x_label"]
-        xaxis = x_nodes[fitname][key]
+        ylabel = HT_PLOT_SPEC[key1]["y_label"]
+        xlabel = HT_PLOT_SPEC[key1]["x_label"]
+
+        xaxis = x_nodes[fitnames[0]][key1]
 
         for fit_idx, fitname in enumerate(fitnames):
           posteriors = posteriors_dict[fitname]
@@ -174,8 +181,8 @@ def compare_multiple_fits(yaml_file: str, output_dir: str = "./Comparison"):
           mean = pd.Series(replicas.mean(axis=1), index=posteriors.index)
           std = pd.Series(replicas.std(axis=1), index=posteriors.index)
 
-          shift_central = mean.xs(level='HT', key=key).to_numpy()
-          shift_std = std.xs(level='HT', key=key).to_numpy()
+          shift_central = mean.xs(level='HT', key=keys[fit_idx]).to_numpy()
+          shift_std = std.xs(level='HT', key=keys[fit_idx]).to_numpy()
 
           color = colors[fit_idx] if colors else None
           hatch = hatchs[fit_idx] if hatchs else None
@@ -199,11 +206,18 @@ def compare_multiple_fits(yaml_file: str, output_dir: str = "./Comparison"):
         # Legend labels
         ax.legend(legends, legend_names, loc='best', fontsize=20)
 
-
+        file_name = f"{key1}_vs_{key2}" if key2 != None else f"{key1}"
         fig.tight_layout(rect=[0, 0, 1, 0.96])
-        fig.savefig(output_path / f"{key}_log_scale.png")
+        fig.savefig(output_path / f"{file_name}_log_scale.png")
         ax.set_xscale('linear')
-        fig.savefig(output_path /  f"{key}_linear_scale.png")
+        fig.savefig(output_path /  f"{file_name}_linear_scale.png")
+
+    for key in common_keys:
+        make_plot(key)
+
+    # Handle custom keys
+    for custom_key_pair in (custom_keys or []):
+        make_plot(*custom_key_pair)
 
     # Copy config file to output directory
     with open(output_path / "config.yaml", 'w') as f:
@@ -240,12 +254,23 @@ def main():
           action='store_true',
           help='Run sequentially instead of in parallel'
       )
+    analyse_parser.add_argument(
+        '-f', '--force',
+        action='store_true',
+        help='Force re-analysis of fits even if results already exist'
+    )
     
     compare_parser = subparser.add_parser('compare', help='Compare multiple fits and generate comparison plots')
     compare_parser.add_argument(
         'yaml_file',
         type=str,
         help="YAML configuration file with fit names and options"
+    )
+    compare_parser.add_argument(
+        '-k', '--custom-keys',
+        nargs='*',
+        type=str,
+        help="Key pairs to compare (e.g., 'key1,key2 key1,key3')"
     )
     compare_parser.add_argument(
         '-o', '--output-dir',
@@ -261,66 +286,74 @@ def main():
     if args.command == 'summary':
         # Generate summary report without running analysis
         generate_summary_report()
-        sys.exit(0)
 
     if args.command == 'compare':
+        # Parser the custom keys into pairs
+        custom_keys = None
+        if args.custom_keys:
+            custom_keys = []
+            for pair in args.custom_keys:
+                keys = pair.split(',')
+                if len(keys) == 2:
+                    custom_keys.append(keys)
+                else:
+                    raise ValueError(f"Invalid key pair: {pair}. Expected format 'key1,key2'.")
         # Compare multiple fits
-        compare_multiple_fits(args.yaml_file, args.output_dir)
-        sys.exit(0)
+        compare_multiple_fits(args.yaml_file, 
+                              custom_keys=custom_keys,
+                              output_dir=args.output_dir)
         
-    
-    # Setup logging
-    setup_logging(args.log_level)
-    logger = logging.getLogger("TCM analysis")
-    
-    logger.info(f"Processing {len(args.fitnames)} fits")
+    if args.command == 'analyse':
+        setup_logging(args.log_level)
+        logger = logging.getLogger("TCM analysis")
+        logger.info(f"Processing {len(args.fitnames)} fits")
 
-    # Prepare arguments for each fit
-    fit_args = [(fit, args.log_level) for fit in args.fitnames]
+        # Prepare arguments for each fit
+        fit_args = [(fit, args.log_level) for fit in args.fitnames]
 
-    if args.jobs == 1 or args.sequential:
-        # Sequential processing
-        logger.info("Running in sequential mode. Single process.")
+        if args.jobs == 1 or args.sequential:
+            # Sequential processing
+            logger.info("Running in sequential mode. Single process.")
 
-        results = {}
-        for fitname, log_level in fit_args:
-            result = process_single_fit(fitname, log_level)
-            results[fitname] = {
-                'success': result[0],
-                'error': result[2]
-            }
+            results = {}
+            for fitname, log_level in fit_args:
+                result = process_single_fit(fitname, log_level, args.force)
+                results[fitname] = {
+                    'success': result[0],
+                    'error': result[2]
+                }
 
-    else:
-        max_workers = args.jobs or 4
-        logger.info(f"Using {max_workers} parallel processes")
-
-        results = batch_process_with_monitoring(fit_args, max_workers)
-
-    # Summary
-    print("\n"+ "="*50)
-    print("SUMMARY")
-    print("="*50)
-
-    successful = []
-    failed = []
-
-    for fitname, value in results.items():
-        if value['success']:
-            successful.append(fitname)
         else:
-            failed.append((fitname, value['error']))
+            max_workers = args.jobs or 4
+            logger.info(f"Using {max_workers} parallel processes")
 
-    logger.info(f"Successful: {len(successful)}/{len(args.fitnames)}")
-    for fit in successful:
-        logger.info(f"  ✓ {fit}")
-    
-    if failed:
-        logger.error(f"Failed: {len(failed)}/{len(args.fitnames)}")
-        for fit, error in failed:
-            logger.error(f"  ✗ {fit}: {error}")
-        sys.exit(1)
-    else:
-        logger.info("All fits processed successfully!")
+            results = batch_process_with_monitoring(fit_args, max_workers, args.force)
+
+        # Summary
+        print("\n"+ "="*50)
+        print("SUMMARY")
+        print("="*50)
+
+        successful = []
+        failed = []
+
+        for fitname, value in results.items():
+            if value['success']:
+                successful.append(fitname)
+            else:
+                failed.append((fitname, value['error']))
+
+        logger.info(f"Successful: {len(successful)}/{len(args.fitnames)}")
+        for fit in successful:
+            logger.info(f"  ✓ {fit}")
+        
+        if failed:
+            logger.error(f"Failed: {len(failed)}/{len(args.fitnames)}")
+            for fit, error in failed:
+                logger.error(f"  ✗ {fit}: {error}")
+            sys.exit(1)
+        else:
+            logger.info("All fits processed successfully!")
 
     generate_summary_report()
     

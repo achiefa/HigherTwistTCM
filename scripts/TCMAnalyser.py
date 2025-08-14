@@ -15,7 +15,6 @@ from validphys.theorycovariance.output import matrix_plot_labels
 from validphys.api import API
 from validphys.theorycovariance.higher_twist_functions import compute_deltas_pc
 
-
 SAVEDIR = Path(__file__).parent.parent / "Results"
 
 def setup_logging(log_level: str = 'INFO') -> None:
@@ -55,7 +54,9 @@ HT_PLOT_SPEC = {"f2p": { "y_label": r"$H \left( F_2^p \right) \; [\textrm{GeV}^2
                 "H2j_ATLAS": { "y_label": r"$H \left( \sigma_{2j}^{\rm ATLAS} \right) \; [\textrm{GeV}]$",
                               "x_label": r"$y^*$"},
                 "H2j_CMS": { "y_label": r"$H \left( \sigma_{2j}^{\rm CMS} \right) \; [\textrm{GeV}]$",
-                            "x_label": r"$|y|_{{max}}$"}}  
+                            "x_label": r"$|y|_{{max}}$"},
+                "H2j":     { "y_label": r"$H \left( \sigma_{2j} \right)\; [\textrm{GeV}]$",
+                            "x_label": r"$y$"}}  
 
 def plot_covmat_heatmap(covmat: pd.DataFrame, title: str) -> plt.Figure:
     """Matrix plot of a covariance matrix."""
@@ -164,6 +165,9 @@ class TCMAnalyzer:
     self.pc_excluded_exps = self.thcovmat_dict['pc_excluded_exps']
     self.fitpath = API.fit(fit=self.fitname).path
 
+    pt_prescriptions = self.thcovmat_dict['point_prescriptions']
+    self.index_name_map = {name: idx for idx, name in enumerate(pt_prescriptions)}
+
     pc_parameters = self.thcovmat_dict['pc_parameters']
     # for key in pc_parameters:
     #     pc_parameters[key]['yshift'] = [round(val, 6) for val in pc_parameters[key]['yshift']]
@@ -262,13 +266,13 @@ class TCMAnalyzer:
       # self.P_tilde.to_csv(self.save_dir / 'P_tilde.csv')
 
 
-  def run_analysis(self, produce_plots=True, save=True):
+  def run_analysis(self, produce_plots=True, save=True, force=False):
       """Run the TCM analysis."""
       try:
         # Check if data has been already processed.
         # If so, load the results and skip the analysis.
         self.logger.info(f"Checking if results for {self.fitname} already exist")
-        if (self.save_dir / 'posteriors.pkl').exists() and (self.save_dir / 'P_tilde.pkl').exists():
+        if (self.save_dir / 'posteriors.pkl').exists() and (self.save_dir / 'P_tilde.pkl').exists() and not force:
           self.logger.info(f"Results for {self.fitname} already exist. Loading from disk.")
           self.posteriors = pd.read_pickle(self.save_dir / 'posteriors.pkl')
           self.P_tilde = pd.read_pickle(self.save_dir / 'P_tilde.pkl')
@@ -300,25 +304,23 @@ class TCMAnalyzer:
       if not hasattr(self, '_C'):
           self.logger.info("Loading covariance matrix")
           C = API.groups_covmat_no_table(**self.common_dict)
+          table_index_list = [idx for name, idx in self.index_name_map.items() if name != 'power corrections']
 
-          # Try to load MHO covmat
-          try:
-              S_scale_var_path = self.fitpath / "tables/datacuts_theory_theorycovmatconfig_point_prescriptions1_theory_covmat_custom_per_prescription.csv"
-              S_scale_var = pd.read_csv(S_scale_var_path, index_col=[0, 1, 2], 
-                                      header=[0, 1, 2], sep="\t|,", engine="python")
-              
-              storedcovmat_index = pd.MultiIndex.from_tuples(
-                  [(aa, bb, np.int64(cc)) for aa, bb, cc in S_scale_var.index],
-                  names=["group", "dataset", "id"],
-              )
-              S_scale_var = pd.DataFrame(
-                  S_scale_var.values, index=storedcovmat_index, columns=storedcovmat_index
-              )
-              S_scale_var = S_scale_var.reindex(C.index).T.reindex(C.index)
-              C = C + S_scale_var
-              self.logger.info("MHO covariance matrix loaded and added")
-          except FileNotFoundError:
-              self.logger.info("No scale variations found")
+          # Load all the other theory covariance matrices
+          for idx in table_index_list:
+            table_name = f"datacuts_theory_theorycovmatconfig_point_prescriptions{idx}_theory_covmat_custom_per_prescription.csv"
+            S_scale_var = pd.read_csv(self.fitpath / str("tables/" + table_name), index_col=[0, 1, 2], 
+                                    header=[0, 1, 2], sep="\t|,", engine="python")
+            storedcovmat_index = pd.MultiIndex.from_tuples(
+                [(aa, bb, np.int64(cc)) for aa, bb, cc in S_scale_var.index],
+                names=["group", "dataset", "id"],
+            )
+            S_scale_var = pd.DataFrame(
+                S_scale_var.values, index=storedcovmat_index, columns=storedcovmat_index
+            )
+            S_scale_var = S_scale_var.reindex(C.index).T.reindex(C.index)
+            C = C + S_scale_var
+            self.logger.info(f"Loading {table_name}")
           self._C = C
       return self._C
   
@@ -402,13 +404,15 @@ class TCMAnalyzer:
 
   def _load_pc_theory_covmat(self):
     """Load the theory covariance matrix."""
-    self.logger.info("Loading theory covariance matrices")
+    self.logger.info("Loading pc theory covariance matrix")
 
     # Experimental index
     index = self.exp_index
+    pc_index = self.index_name_map['power corrections']
 
     # Load power corrections covmat
-    S_path = self.fitpath / "tables/datacuts_theory_theorycovmatconfig_point_prescriptions0_theory_covmat_custom_per_prescription.csv"
+    table_name = f"datacuts_theory_theorycovmatconfig_point_prescriptions{pc_index}_theory_covmat_custom_per_prescription.csv"
+    S_path = self.fitpath / str("tables/" + table_name)
     S = pd.read_csv(S_path, index_col=[0, 1, 2], header=[0, 1, 2], 
                     sep="\t|,", engine="python")
     
