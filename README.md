@@ -84,7 +84,7 @@ from tcm import (
     load_fit_config,
     load_covariance_matrix,
     load_predictions,
-    load_pseudodata,
+    load_cntrl_pseudodata,
     compute_posteriors,
     fluctuate_with_covariance,
     plot_posterior,
@@ -94,7 +94,7 @@ from tcm import (
 config = load_fit_config("my_nnpdf_fit")
 C, S = load_covariance_matrix("my_nnpdf_fit")
 predictions = load_predictions("my_nnpdf_fit")
-pseudodata = load_pseudodata("my_nnpdf_fit", predictions)
+pseudodata = load_cntrl_pseudodata("my_nnpdf_fit")
 
 # Compute posteriors via Bayesian update
 posteriors, P_tilde = compute_posteriors(config, C, S, predictions, pseudodata)
