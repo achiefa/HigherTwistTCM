@@ -183,12 +183,14 @@ def produce_cfactors(fitname, posteriors_dir, output_dir):
 If you use this code, please cite:
 
 ```bibtex
-@article{Ball:2025xxx,
+@article{Ball:2025xtj,
     author = "Ball, Richard D. and Chiefa, Amedeo and Stegeman, Roy",
     title = "{Parton distributions with higher twist and jet power corrections}",
     eprint = "2511.14387",
     archivePrefix = "arXiv",
     primaryClass = "hep-ph",
+    reportNumber = "Edinburgh 2025/29",
+    month = "11",
     year = "2025"
 }
 ```
