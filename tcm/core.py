@@ -80,7 +80,7 @@ def compute_posteriors(
     S_hat = _compute_S_hat(beta, beta_tilde)
 
     # Compute PDF replica covariance
-    X = _compute_replica_covariance(predictions)
+    X = _compute_replica_covariance(fit_config["fitname"])
 
     # Compute inverse of total covariance, dropping the "group" level
     # so that the index matches S_hat columns (which come from beta after droplevel("group"))

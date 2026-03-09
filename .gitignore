@@ -211,3 +211,5 @@ Comparisons/*
 *.html
 
 .DS_Store
+tcm/tests/output
+old_delete

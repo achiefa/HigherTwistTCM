@@ -123,6 +123,7 @@ def produce_cfactors(
                 raise
 
     logger.info(f"C-factors saved to {cfactor_path}")
+    return cfactor_path
 
 
 def compute_dis_cfactor(
