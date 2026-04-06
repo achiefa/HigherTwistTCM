@@ -1,0 +1,134 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tcm"
+version = "1.0.0"
+description = "Theory Covariance Method for extracting power corrections in global PDF fits"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Amedeo Chiefa", email = "amedeo.chiefa@ed.ac.uk"},
+]
+maintainers = [
+    {name = "Amedeo Chiefa", email = "amedeo.chiefa@ed.ac.uk"},
+]
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Typing :: Typed",
+]
+keywords = [
+    "PDF",
+    "parton distribution functions",
+    "QCD",
+    "higher twist",
+    "power corrections",
+    "NNPDF",
+    "Bayesian inference",
+    "LHC",
+    "phenomenology",
+]
+
+dependencies = [
+    "numpy>=1.21",
+    "pandas>=1.3",
+    "matplotlib>=3.5",
+    "pyyaml>=6.0",
+    "pineappl>=0.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "hypothesis>=6.0",
+]
+lint = [
+    "black>=23.0",
+    "ruff>=0.1",
+    "mypy>=1.0",
+    "pandas-stubs",
+]
+all = ["tcm[dev,lint]"]
+
+[project.scripts]
+tcm = "tcm.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/achiefa/HigherTwistTCM"
+Documentation = "https://github.com/achiefa/HigherTwistTCM#readme"
+Repository = "https://github.com/achiefa/HigherTwistTCM.git"
+Paper = "https://arxiv.org/abs/2511.14387"
+Issues = "https://github.com/achiefa/HigherTwistTCM/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.package-data]
+tcm = ["py.typed"]
+
+[tool.black]
+line-length = 88
+target-version = ["py310", "py311", "py312"]
+include = '\.pyi?$'
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes
+    "W",      # pycodestyle warnings
+    "I",      # isort
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+    "TCH",    # flake8-type-checking
+    "RUF",    # ruff-specific
+]
+ignore = [
+    "E501",   # line too long (handled by black)
+    "B008",   # function call in default argument
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["tcm"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+strict_optional = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["tcm"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
