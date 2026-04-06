@@ -72,8 +72,6 @@ from .plotting import (
 # C-factor production
 from .cfactors import (
     produce_cfactors,
-    compute_dis_cfactor,
-    compute_jet_cfactor,
     save_cfactor,
 )
 

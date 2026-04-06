@@ -50,15 +50,25 @@ PLOT_SPECS = {
     "H2j_ystar": {
         "ylabel": r"$H \left( \sigma_{2j}^{y^*} \right) \; [\textrm{GeV}]$",
         "xlabel": r"$y^*$",
-        "title": r"ATLAS dijet power correction",
+        "title": r"dijet power correction",
     },
     "H2j_ymax": {
         "ylabel": r"$H \left( \sigma_{2j}^{|y|_{\rm max}} \right) \; [\textrm{GeV}]$",
         "xlabel": r"$|y|_{\rm max}$",
-        "title": r"CMS dijet power correction",
-    }
+        "title": r"dijet power correction",
+    },
+    "H2j_yb": {
+        "ylabel": r"$H \left( \sigma_{2j}^{y_b} \right) \; [\textrm{GeV}]$",
+        "xlabel": r"$y_b$",
+        "title": r"dijet power correction",
+    },
 }
 
+ALIASES_PLOT_SPECS = {
+    "H2j_ATLAS": "H2j_ystar",
+    "H2j_CMS": "H2j_ymax",
+}
+DIJET_LEGACY = {v: k for k, v in ALIASES_PLOT_SPECS.items()}
 
 def plot_posterior(
     mean: pd.Series,
@@ -114,6 +124,9 @@ def plot_posterior(
     try:
         central = mean.xs(level="HT", key=pc_type).to_numpy()
         uncertainty = std.xs(level="HT", key=pc_type).to_numpy()
+    except KeyError:
+        central = mean.xs(level="HT", key=DIJET_LEGACY.get(pc_type, pc_type)).to_numpy()
+        uncertainty = std.xs(level="HT", key=DIJET_LEGACY.get(pc_type, pc_type)).to_numpy()
     except KeyError:
         raise KeyError(f"Power correction type '{pc_type}' not found in data")
 

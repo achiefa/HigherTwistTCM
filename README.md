@@ -142,19 +142,6 @@ def compute_posteriors(fit_config, C, S, predictions, pseudodata):
     """
 ```
 
-### Uncertainty Propagation
-
-Generates correlated samples from the posterior using Cholesky decomposition:
-
-```python
-def fluctuate_with_covariance(covariance, central_values, n_replicas=1000):
-    """
-    Sample from N(μ, Σ) using L L^T = Σ decomposition.
-
-    Handles singular covariance by projecting out zero modes.
-    """
-```
-
 ### C-Factor Production
 
 Converts extracted posteriors into multiplicative correction factors:

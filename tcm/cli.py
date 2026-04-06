@@ -183,7 +183,7 @@ def run_comparison(
     import pandas as pd
     from .io import load_results
     from .core import fluctuate_with_covariance
-    from .plotting import plot_comparison, PLOT_SPECS
+    from .plotting import plot_comparison, PLOT_SPECS, ALIASES_PLOT_SPECS
     from validphys.api import API
 
     with open(config_file) as f:
@@ -207,6 +207,7 @@ def run_comparison(
     # Load results and nodes for each fit
     results = {}
     nodes = {}
+    sets = []
 
     for fitname in fitnames:
         logger.info(f"Loading results for {fitname}")
@@ -225,10 +226,11 @@ def run_comparison(
         # Get nodes from fit config
         fit_dict = API.fit(fit=fitname).as_input()
         pc_params = fit_dict["theorycovmatconfig"]["pc_parameters"]
-        nodes[fitname] = {name: params["nodes"] for name, params in pc_params.items()}
+        nodes[fitname] = {ALIASES_PLOT_SPECS.get(name, name): params["nodes"] for name, params in pc_params.items()}
+        sets.append(set([ALIASES_PLOT_SPECS.get(proc, proc) for proc in nodes[fitname].keys()]))
 
     # Find common PC types across all fits
-    common_types = set.intersection(*[set(n.keys()) for n in nodes.values()])
+    common_types = set.intersection(*sets)
 
     # Generate comparison plots
     for pc_type in common_types:
@@ -269,6 +271,7 @@ def main():
     analyse.add_argument("-j", "--jobs", type=int, default=1, help="Parallel jobs")
     analyse.add_argument("-f", "--force", action="store_true", help="Force recompute")
     analyse.add_argument("--log-level", default="INFO", help="Logging level")
+    analyse.add_argument("-p", "--plots", default=True, action="store_false", help="Disable plot generation")
     analyse.add_argument(
         "-o", "--output", type=Path, default=DEFAULT_RESULTS_DIR, help="Output directory"
     )
@@ -304,7 +307,7 @@ def main():
 
             with ProcessPoolExecutor(max_workers=args.jobs) as executor:
                 futures = {
-                    executor.submit(run_analysis, fit, args.output, args.force): fit
+                    executor.submit(run_analysis, fit, args.output, args.force, args.plots): fit
                     for fit in args.fitnames
                 }
 
@@ -316,7 +319,7 @@ def main():
         else:
             # Sequential processing
             for fitname in args.fitnames:
-                success, _, error = run_analysis(fitname, args.output, args.force)
+                success, _, error = run_analysis(fitname, args.output, args.force, args.plots)
                 results[fitname] = {"success": success, "error": error}
 
         # Summary
